@@ -1,0 +1,111 @@
+/* Estilos generales para el cuerpo de la página */
+body {
+    font-family: 'Montserrat', sans-serif;
+    margin: 0;
+    padding: 0;
+    
+    /* CENTRADO DEFINITIVO (GRID) */
+    display: grid; 
+    place-items: center; 
+    
+    min-height: 100vh;
+    width: 100vw;
+    
+    /* FONDO LLAMATIVO */
+    background-image: url('fondo_matriz.jpg'); 
+    background-size: cover; 
+    background-position: center;
+    background-color: #1a0a33; 
+    
+    color: white;
+    overflow-x: hidden;
+    box-sizing: border-box;
+    
+    font-size: 13px; 
+}
+
+/* Contenedor principal */
+.container {
+    width: 100%;
+    max-width: 380px; 
+    padding: 0 0.8rem; 
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center; 
+    text-align: center;
+    box-sizing: border-box;
+    padding-top: 1.2rem; 
+    padding-bottom: 1.2rem; 
+}
+
+/* Estilos para el contenedor de la imagen */
+.image-wrapper {
+    width: 75%; 
+    aspect-ratio: 1 / 1; 
+    overflow: hidden; 
+    border-radius: 50%; 
+    margin-bottom: 1.5rem; 
+}
+
+/* Estilos para la imagen principal */
+.main-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; 
+    border-radius: 50%; 
+    box-shadow: none; 
+}
+
+/* Estilos para el nuevo grupo de un solo botón */
+.single-button-group {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem; 
+    margin-top: 0.5rem; 
+}
+
+/* ESTILOS PARA EL FONDO DEL TEXTO */
+.cta-background {
+    background-color: #e91e63; 
+    border-radius: 50px; 
+    padding: 0.5rem 1rem; 
+    display: inline-block;
+    max-width: 90%; 
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2); 
+    line-height: 1.2; 
+}
+
+/* ESTILOS DEL TEXTO (BLANCO SÓLIDO) */
+.cta-text {
+    color: white; 
+    font-weight: 900; 
+    font-size: 1.1rem; 
+    margin: 0; 
+    text-shadow: none;
+}
+
+/* Estilos del botón (UNIRME AL GRUPO) */
+.btn {
+    display: block;
+    width: 90%; 
+    padding: 0.8rem 1.2rem; 
+    background-color: #e91e63;
+    color: white;
+    text-decoration: none;
+    border-radius: 50px; 
+    font-size: 1.5rem; 
+    font-weight: 900; 
+    letter-spacing: 0.15rem; 
+    text-transform: uppercase;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3); 
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+/* Estilo al pasar el ratón (interactividad) */
+.btn:hover, .btn:active {
+    background-color: #d81b60;
+    transform: translateY(-1px);
+}
