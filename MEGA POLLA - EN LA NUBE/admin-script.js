@@ -4,165 +4,118 @@ document.addEventListener('DOMContentLoaded', async () => {
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const CLAVES_VALIDAS = ['29931335', '24175402'];
-    const JUGADA_SIZE = 7; 
-
     let participantes = [];
     let resultados = [];
     let finanzas = { ventas: 0, recaudado: 0.00, acumulado: 0.00 };
 
-    // --- BLOQUEO ---
-    function iniciarBloqueo() {
-        let accesoConcedido = false;
-        let intentos = 0;
-        while (!accesoConcedido && intentos < 3) {
-            const claveIngresada = prompt("🔒 Acceso Restringido.\nClave de admin:");
-            if (claveIngresada && CLAVES_VALIDAS.includes(claveIngresada.trim())) {
-                accesoConcedido = true;
-            } else {
-                intentos++;
-                if (intentos >= 3) window.location.href = "index.html";
-            }
-        }
+    // --- BLOQUEO DE ACCESO ---
+    const claveAcceso = prompt("🔒 Acceso Administrativo\nIngrese su clave:");
+    if (!CLAVES_VALIDAS.includes(claveAcceso)) {
+        alert("Acceso denegado");
+        window.location.href = "index.html";
     }
-    iniciarBloqueo();
 
-    // --- CARGA Y GUARDADO (TABLA ÚNICA polla_datos) ---
-    async function cargarDatosDesdeSupabase() {
+    // --- FUNCIONES DE NUBE (TABLA ÚNICA) ---
+    async function cargarTodo() {
         const { data, error } = await _supabase.from('polla_datos').select('*');
-        if (error) return console.error("Error:", error);
+        if (error) return console.error("Error al cargar:", error);
 
         data.forEach(item => {
             if (item.tipo === 'participantes') participantes = item.contenido || [];
             if (item.tipo === 'resultados') resultados = item.contenido || [];
-            if (item.tipo === 'finanzas') finanzas = item.contenido || { ventas: 0, recaudado: 0, acumulado: 0 };
+            if (item.tipo === 'finanzas') finanzas = item.contenido || finanzas;
         });
-        renderTodo();
+        renderizar();
     }
 
-    async function guardarEnNube(tipo, contenido) {
-        await _supabase.from('polla_datos').upsert({ tipo: tipo, contenido: contenido }, { onConflict: 'tipo' });
+    async function actualizarNube(tipo, contenido) {
+        await _supabase.from('polla_datos').upsert({ tipo, contenido }, { onConflict: 'tipo' });
     }
 
-    function renderTodo() {
-        renderResultados();
-        renderParticipantes();
-        if(document.getElementById('input-ventas')) {
-            document.getElementById('input-ventas').value = finanzas.ventas || 0;
-            document.getElementById('input-recaudado').value = finanzas.recaudado || 0;
-            document.getElementById('input-acumulado').value = finanzas.acumulado || 0;
-        }
-    }
+    // --- PROCESADOR WHATSAPP ---
+    document.getElementById('btn-procesar-pegado').onclick = () => {
+        const texto = document.getElementById('input-paste-data').value;
+        const lineas = texto.split('\n');
+        let nombre = "", refe = "", jugadasDetectadas = [];
 
-    // --- GESTIÓN RESULTADOS ---
-    const formRes = document.getElementById('form-resultados');
-    if (formRes) {
-        formRes.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const sorteo = document.getElementById('sorteo-hora').value;
-            const numero = document.getElementById('numero-ganador').value.padStart(2, '0');
-            resultados.push({ sorteo, numero });
-            await guardarEnNube('resultados', resultados);
-            renderTodo();
-            formRes.reset();
+        lineas.forEach(linea => {
+            const numeros = linea.match(/\b\d{2}\b/g);
+            if (numeros && numeros.length >= 7) {
+                jugadasDetectadas.push(numeros.slice(0, 7).join(','));
+            } else if (linea.toLowerCase().includes("refe:")) {
+                refe = linea.match(/\d+/) ? linea.match(/\d+/)[0] : "";
+            } else if (linea.length > 3 && isNaN(linea[0])) {
+                nombre = linea.trim().toUpperCase();
+            }
         });
-    }
 
-    function renderResultados() {
-        const lista = document.getElementById('lista-resultados');
-        if (!lista) return;
-        lista.innerHTML = resultados.map((res, i) => `
-            <li>
-                <strong>${res.sorteo}:</strong> ${res.numero}
-                <button onclick="eliminarResultado(${i})">X</button>
-            </li>
-        `).join('');
-    }
-
-    window.eliminarResultado = async (index) => {
-        resultados.splice(index, 1);
-        await guardarEnNube('resultados', resultados);
-        renderTodo();
+        document.getElementById('nombre').value = nombre;
+        document.getElementById('refe').value = refe;
+        document.getElementById('jugadas-procesadas').value = jugadasDetectadas.join(' | ');
     };
 
-    // --- PROCESAMIENTO WHATSAPP ---
-    const btnProcesar = document.getElementById('btn-procesar-pegado');
-    if (btnProcesar) {
-        btnProcesar.addEventListener('click', () => {
-            const rawData = document.getElementById('input-paste-data').value;
-            const lines = rawData.split('\n').map(l => l.trim());
-            let nombre = ""; let refe = ""; let jugadas = [];
-
-            lines.forEach(line => {
-                const numbers = line.match(/\b\d{2}\b/g);
-                if (numbers && numbers.length >= JUGADA_SIZE) {
-                    jugadas.push(numbers.slice(0, 7).join(','));
-                } else if (line.toLowerCase().includes("refe:")) {
-                    refe = line.match(/\d+/) ? line.match(/\d+/)[0] : "";
-                } else if (line.length > 3 && isNaN(line.charAt(0))) {
-                    nombre = line.toUpperCase();
-                }
-            });
-            document.getElementById('nombre').value = nombre;
-            document.getElementById('refe').value = refe;
-            document.getElementById('jugadas-procesadas').value = jugadas.join(' | ');
-        });
-    }
-
-    // --- REGISTRO PARTICIPANTE ---
-    const formPart = document.getElementById('form-participante');
-    if (formPart) {
-        formPart.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const jugadasRaw = document.getElementById('jugadas-procesadas').value.split('|');
-            jugadasRaw.forEach(grupo => {
-                const nums = grupo.split(',').map(n => n.trim());
-                if(nums.length === 7) {
-                    participantes.push({
-                        nombre: document.getElementById('nombre').value,
-                        refe: document.getElementById('refe').value,
-                        jugada: nums // Importante: Guardar los números
-                    });
-                }
-            });
-            await guardarEnNube('participantes', participantes);
-            renderTodo();
-            formPart.reset();
-        });
-    }
-
-    function renderParticipantes() {
-        const lista = document.getElementById('lista-participantes');
-        if (!lista) return;
-        const filtro = document.getElementById('input-buscar-participante').value.toLowerCase();
-        const filtrados = participantes.filter(p => p.nombre.toLowerCase().includes(filtro));
+    // --- REGISTRO DE JUGADA ---
+    document.getElementById('form-participante').onsubmit = async (e) => {
+        e.preventDefault();
+        const jugadasRaw = document.getElementById('jugadas-procesadas').value.split('|');
         
-        lista.innerHTML = filtrados.map((p, i) => `
-            <li>
-                #${i+1} - <strong>${p.nombre}</strong> (${p.refe})
-                <br><small>Jugada: ${p.jugada.join(' - ')}</small>
-                <button onclick="eliminarParticipante(${i})">Eliminar</button>
-            </li>
-        `).join('');
-    }
+        jugadasRaw.forEach(grupo => {
+            const nums = grupo.split(',').map(n => n.trim());
+            if (nums.length === 7) {
+                participantes.push({
+                    nombre: document.getElementById('nombre').value.toUpperCase(),
+                    refe: document.getElementById('refe').value,
+                    jugada: nums
+                });
+            }
+        });
 
-    window.eliminarParticipante = async (index) => {
-        participantes.splice(index, 1);
-        await guardarEnNube('participantes', participantes);
-        renderTodo();
+        await actualizarNube('participantes', participantes);
+        cargarTodo();
+        e.target.reset();
+        document.getElementById('input-paste-data').value = "";
+    };
+
+    // --- RESULTADOS ---
+    document.getElementById('form-resultados').onsubmit = async (e) => {
+        e.preventDefault();
+        resultados.push({
+            sorteo: document.getElementById('sorteo-hora').value,
+            numero: document.getElementById('numero-ganador').value.padStart(2, '0')
+        });
+        await actualizarNube('resultados', resultados);
+        cargarTodo();
+        e.target.reset();
     };
 
     // --- FINANZAS ---
-    const fFinanzas = document.getElementById('form-finanzas');
-    if (fFinanzas) {
-        fFinanzas.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            finanzas.ventas = document.getElementById('input-ventas').value;
-            finanzas.recaudado = document.getElementById('input-recaudado').value;
-            finanzas.acumulado = document.getElementById('input-acumulado').value;
-            await guardarEnNube('finanzas', finanzas);
-            alert("Dinero sincronizado");
-        });
+    document.getElementById('form-finanzas').onsubmit = async (e) => {
+        e.preventDefault();
+        finanzas.ventas = document.getElementById('input-ventas').value;
+        finanzas.recaudado = document.getElementById('input-recaudado').value;
+        finanzas.acumulado = document.getElementById('input-acumulado').value;
+        await actualizarNube('finanzas', finanzas);
+        alert("💰 Finanzas sincronizadas");
+    };
+
+    function renderizar() {
+        const listaP = document.getElementById('lista-participantes');
+        listaP.innerHTML = participantes.map((p, i) => `
+            <li style="background:#f4f4f4; padding:8px; margin-bottom:5px; border-radius:5px;">
+                <strong>${p.nombre}</strong> (${p.refe}) <br>
+                <small>N°s: ${p.jugada.join('-')}</small>
+                <button onclick="borrarP(${i})" style="float:right; color:red;">Eliminar</button>
+            </li>
+        `).join('');
+
+        const listaR = document.getElementById('lista-resultados');
+        listaR.innerHTML = resultados.map((r, i) => `
+            <li>${r.sorteo}: <strong>${r.numero}</strong> <button onclick="borrarR(${i})">x</button></li>
+        `).join('');
     }
 
-    await cargarDatosDesdeSupabase();
+    window.borrarP = async (i) => { participantes.splice(i, 1); await actualizarNube('participantes', participantes); cargarTodo(); };
+    window.borrarR = async (i) => { resultados.splice(i, 1); await actualizarNube('resultados', resultados); cargarTodo(); };
+
+    cargarTodo();
 });
