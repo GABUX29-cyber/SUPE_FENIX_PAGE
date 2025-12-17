@@ -1,169 +1,52 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Polla de Números - Ranking Público</title>
-    <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body>
+document.addEventListener('DOMContentLoaded', async () => {
+    const SUPABASE_URL = 'https://ymvpaooxdqhayzcumrpj.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_TdMi6H9GkduboyrDAf0L3g_Ct5C7Wqy';
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    <header>
-        <h1>POLLA DE NÚMEROS</h1>
-        <p id="fecha-actual">Cargando fecha...</p>
-    </header>
+    let participantes = [];
+    let resultados = [];
+    let finanzas = {};
 
-    <div class="card-container">
-        <div class="card estadistica ventas">
-            <h3>JUGADAS</h3>
-            <div id="stat-ventas" class="valor">0</div>
-        </div>
-        <div class="card estadistica acumulado">
-            <h3>ACUMULADO</h3>
-            <div id="stat-acumulado" class="valor">$0</div>
-        </div>
-        <div class="card estadistica recaudado">
-            <h3>RECAUDADO</h3>
-            <div id="stat-recaudado" class="valor">$0</div>
-        </div>
-        <div class="card estadistica ganadores">
-            <h3>GANADORES</h3>
-            <div id="stat-ganadores" class="valor">0</div>
-        </div>
-    </div>
+    async function cargarPublico() {
+        const { data, error } = await _supabase.from('polla_datos').select('*');
+        if (error) return;
 
-    <div class="card-container full-width">
-        <div class="card resultados-dia">
-            <h2>RESULTADOS DEL DÍA</h2>
-            <table class="resultados-grilla" id="tabla-resultados">
-                <thead>
-                    <tr>
-                        <th>SORTEO</th>
-                        <th>N°</th>
-                    </tr>
-                </thead>
-                <tbody id="cuerpo-resultados">
-                    </tbody>
-            </table>
-        </div>
-    </div>
+        data.forEach(item => {
+            if (item.tipo === 'participantes') participantes = item.contenido || [];
+            if (item.tipo === 'resultados') resultados = item.contenido || [];
+            if (item.tipo === 'finanzas') finanzas = item.contenido || {};
+        });
 
-    <div class="filtro-container">
-        <div class="filtro-input-wrapper">
-            <input type="text" id="input-buscar-participante" class="filtro-input" placeholder="🔍 Buscar por nombre o referencia..." onkeyup="filtrarRanking()">
-        </div>
-    </div>
+        actualizarUI();
+    }
 
-    <div class="card-container full-width">
-        <div class="card ranking">
-            <table id="tabla-ranking">
-                <thead>
-                    <tr>
-                        <th>N°</th>
-                        <th>PARTICIPANTE</th>
-                        <th>REFE</th>
-                        <th>JUGADA</th>
-                        <th>ACIERTOS</th>
-                    </tr>
-                </thead>
-                <tbody id="cuerpo-ranking">
-                    </tbody>
-            </table>
-        </div>
-    </div>
+    function actualizarUI() {
+        // Actualizar cuadros de montos
+        const totalVentas = finanzas.ventas || 0;
+        const totalRecaudado = finanzas.recaudado || 0;
+        
+        document.getElementById('total-jugadas').innerText = totalVentas;
+        document.getElementById('monto-recaudado').innerText = `Bs.${totalRecaudado}`;
+        
+        // Calcular aciertos y mostrar ranking
+        const lista = document.getElementById('tabla-ranking');
+        if (!lista) return;
 
-    <script>
-        // Configuración de Supabase
-        const SUPABASE_URL = 'https://ymvpaooxdqhayzcumrpj.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_TdMi6H9GkduboyrDAf0L3g_Ct5C7Wqy';
-        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-        async function cargarDatosPublicos() {
-            const { data, error } = await _supabase.from('polla_datos').select('*');
-            
-            if (error) {
-                console.error("Error al cargar:", error);
-                return;
-            }
-
-            let participantes = [];
-            let resultados = [];
-            let finanzas = { ventas: 0, acumulado: 0, recaudado: 0 };
-
-            data.forEach(item => {
-                if (item.tipo === 'participantes') participantes = item.contenido;
-                if (item.tipo === 'resultados') resultados = item.contenido;
-                if (item.tipo === 'finanzas') finanzas = item.contenido;
-            });
-
-            // 1. Actualizar Estadísticas
-            document.getElementById('stat-ventas').innerText = participantes.length;
-            document.getElementById('stat-acumulado').innerText = `$${finanzas.acumulado || 0}`;
-            document.getElementById('stat-recaudado').innerText = `$${finanzas.recaudado || 0}`;
-
-            // 2. Renderizar Resultados del Día
-            const cuerpoRes = document.getElementById('cuerpo-resultados');
-            cuerpoRes.innerHTML = resultados.map(r => `
+        const ganadores = resultados.map(r => r.numero);
+        
+        lista.innerHTML = participantes.map((p, i) => {
+            const aciertos = p.jugada.filter(n => ganadores.includes(n)).length;
+            return `
                 <tr>
-                    <td class="sorteo-name">${r.sorteo}</td>
-                    <td class="numero-resultado">${r.numero}</td>
+                    <td>${i + 1}</td>
+                    <td>${p.nombre}</td>
+                    <td>${p.refe}</td>
+                    <td>${p.jugada.join(' - ')}</td>
+                    <td class="aciertos">${aciertos}</td>
                 </tr>
-            `).join('');
+            `;
+        }).join('');
+    }
 
-            // 3. Renderizar Ranking (Cálculo de aciertos incluido)
-            const cuerpoRanking = document.getElementById('cuerpo-ranking');
-            const numerosGanadores = resultados.map(r => r.numero);
-
-            cuerpoRanking.innerHTML = participantes.map((p, index) => {
-                let aciertosCount = 0;
-                const jugadaHTML = p.jugada.map(n => {
-                    const esAcierto = numerosGanadores.includes(n);
-                    if (esAcierto) aciertosCount++;
-                    return `<span class="ranking-box ${esAcierto ? 'jugada-acierto' : ''}">${n}</span>`;
-                }).join(' ');
-
-                // Clase de color según aciertos (aciertos-0, aciertos-1, etc.)
-                const claseFila = `aciertos-${aciertosCount}`;
-
-                return `
-                    <tr class="${claseFila}">
-                        <td class="cell-nro"><span class="ranking-box">${index + 1}</span></td>
-                        <td class="cell-participante"><span class="ranking-box">${p.nombre}</span></td>
-                        <td class="cell-refe"><span class="ranking-box">${p.refe}</span></td>
-                        <td class="cell-jugada">${jugadaHTML}</td>
-                        <td class="cell-aciertos">
-                            ${aciertosCount === 7 ? '<span class="ganador-final">GANADOR</span>' : `<div class="aciertos-box">${aciertosCount}</div>`}
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-
-            // Actualizar contador de ganadores de 7
-            const totalGanadores = participantes.filter(p => {
-                let a = 0;
-                p.jugada.forEach(n => { if(numerosGanadores.includes(n)) a++; });
-                return a === 7;
-            }).length;
-            document.getElementById('stat-ganadores').innerText = totalGanadores;
-        }
-
-        function filtrarRanking() {
-            const query = document.getElementById('input-buscar-participante').value.toLowerCase();
-            const filas = document.querySelectorAll('#cuerpo-ranking tr');
-            filas.forEach(fila => {
-                const texto = fila.innerText.toLowerCase();
-                fila.style.display = texto.includes(query) ? '' : 'none';
-            });
-        }
-
-        // Mostrar fecha actual
-        const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        document.getElementById('fecha-actual').innerText = new Date().toLocaleDateString('es-ES', opciones);
-
-        // Cargar datos al abrir la página
-        window.onload = cargarDatosPublicos;
-    </script>
-</body>
-</html>
+    cargarPublico();
+});
